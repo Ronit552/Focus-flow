@@ -18,6 +18,24 @@ const formatTime = (totalSeconds: number): string => {
   return `${hours}:${minutes}:${seconds}`;
 };
 
+const workerCode = `
+  let timerId = null;
+  self.onmessage = function(e) {
+    if (e.data.command === 'start') {
+      if (timerId) return; // Already running
+      timerId = setInterval(() => {
+        self.postMessage('tick');
+      }, 1000);
+    } else if (e.data.command === 'stop') {
+      if (timerId) {
+        clearInterval(timerId);
+        timerId = null;
+      }
+    }
+  };
+`;
+
+
 const App: React.FC = () => {
   const [studyTime, setStudyTime] = useState(0);
   const [codingTime, setCodingTime] = useState(0);
@@ -43,6 +61,12 @@ const App: React.FC = () => {
   
   const historyRef = useRef(history);
   historyRef.current = history;
+  
+  const activeTimerRef = useRef(activeTimer);
+  activeTimerRef.current = activeTimer;
+  const timerStatusRef = useRef(timerStatus);
+  timerStatusRef.current = timerStatus;
+  const workerRef = useRef<Worker | null>(null);
 
   const getInitialState = useCallback(() => {
     try {
@@ -71,6 +95,28 @@ const App: React.FC = () => {
   }, [getInitialState]);
 
   useEffect(() => {
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    const workerUrl = URL.createObjectURL(blob);
+    const worker = new Worker(workerUrl);
+    workerRef.current = worker;
+
+    worker.onmessage = () => {
+      if (timerStatusRef.current === 'running') {
+        if (activeTimerRef.current === 'Study') {
+          setStudyTime(prev => prev + 1);
+        } else if (activeTimerRef.current === 'Coding') {
+          setCodingTime(prev => prev + 1);
+        }
+      }
+    };
+    
+    return () => {
+      worker.terminate();
+      URL.revokeObjectURL(workerUrl);
+    };
+  }, []); // Run only once
+
+  useEffect(() => {
     try {
       window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(historyRef.current));
     } catch (error) {
@@ -79,18 +125,12 @@ const App: React.FC = () => {
   }, [history]);
 
   useEffect(() => {
-    let interval: number | undefined;
-    if (timerStatus === 'running' && activeTimer) {
-      interval = setInterval(() => {
-        if (activeTimer === 'Study') {
-          setStudyTime(prev => prev + 1);
-        } else {
-          setCodingTime(prev => prev + 1);
-        }
-      }, 1000);
+    if (timerStatus === 'running') {
+      workerRef.current?.postMessage({ command: 'start' });
+    } else { // 'paused' or 'stopped'
+      workerRef.current?.postMessage({ command: 'stop' });
     }
-    return () => clearInterval(interval);
-  }, [timerStatus, activeTimer]);
+  }, [timerStatus]);
 
   const handleStart = (type: TimerType) => {
     if (activeTimer && activeTimer !== type) {
