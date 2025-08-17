@@ -70,7 +70,7 @@ const HistorySection: React.FC<HistorySectionProps> = ({ todayHistory, yesterday
   const todayCodingRef = useRef<HTMLDivElement>(null);
   const yesterdayCodingRef = useRef<HTMLDivElement>(null);
 
-  const downloadHistoryAsImage = async (element: HTMLElement | null, fileName: string) => {
+  const downloadHistoryAsImage = async (element: HTMLElement | null, fileName: string, historyDateString: string) => {
     if (!element) return;
 
     if (typeof html2canvas === 'undefined') {
@@ -78,9 +78,14 @@ const HistorySection: React.FC<HistorySectionProps> = ({ todayHistory, yesterday
         alert("Error: The image generation library is not loaded. Please check your internet connection and try again.");
         return;
     }
+    
+    const downloadTime = new Date();
+    // Parse the date string to avoid timezone issues with `new Date(string)`
+    const [year, month, day] = historyDateString.split('-').map(Number);
+    const historyDate = new Date(year, month - 1, day);
 
-    const timestamp = new Date();
-    const timestampString = `<strong>Downloaded:</strong> ${timestamp.toLocaleDateString()} at ${timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    const timestampString = `<strong>History Date:</strong> ${historyDate.toLocaleDateString()} | <strong>Downloaded:</strong> ${downloadTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    
     const timestampEl = document.createElement('div');
     timestampEl.innerHTML = timestampString;
     timestampEl.style.textAlign = 'center';
@@ -92,10 +97,11 @@ const HistorySection: React.FC<HistorySectionProps> = ({ todayHistory, yesterday
     timestampEl.style.fontFamily = `sans-serif`;
     timestampEl.style.letterSpacing = '0.5px';
     
-    const strongTag = timestampEl.querySelector('strong');
-    if (strongTag) {
+    const strongTags = timestampEl.querySelectorAll('strong');
+    strongTags.forEach(strongTag => {
         strongTag.style.color = '#94a3b8'; // slate-400
-    }
+    });
+
 
     element.appendChild(timestampEl);
 
@@ -167,7 +173,7 @@ const HistorySection: React.FC<HistorySectionProps> = ({ todayHistory, yesterday
           <h3 className="text-2xl font-bold text-center bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400">Study History</h3>
           <CategoryHistoryDisplay ref={todayStudyRef} history={todayHistory} title="Today's Progress" filterType="Study" />
           <button
-            onClick={() => downloadHistoryAsImage(todayStudyRef.current, `study-history-${todayHistory.date}`)}
+            onClick={() => downloadHistoryAsImage(todayStudyRef.current, `study-history-${todayHistory.date}`, todayHistory.date)}
             className="w-full py-2 px-5 rounded-lg font-semibold bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={!hasTodayStudy}
           >
@@ -178,7 +184,7 @@ const HistorySection: React.FC<HistorySectionProps> = ({ todayHistory, yesterday
             <>
               <CategoryHistoryDisplay ref={yesterdayStudyRef} history={yesterdayHistory} title="Yesterday's Progress" filterType="Study" />
               <button
-                onClick={() => yesterdayHistory && downloadHistoryAsImage(yesterdayStudyRef.current, `study-history-${yesterdayHistory.date}`)}
+                onClick={() => yesterdayHistory && downloadHistoryAsImage(yesterdayStudyRef.current, `study-history-${yesterdayHistory.date}`, yesterdayHistory.date)}
                 className="w-full py-2 px-5 rounded-lg font-semibold bg-purple-600 hover:bg-purple-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={!hasYesterdayStudy}
               >
@@ -193,7 +199,7 @@ const HistorySection: React.FC<HistorySectionProps> = ({ todayHistory, yesterday
           <h3 className="text-2xl font-bold text-center bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-400">Coding History</h3>
           <CategoryHistoryDisplay ref={todayCodingRef} history={todayHistory} title="Today's Progress" filterType="Coding" />
            <button
-            onClick={() => downloadHistoryAsImage(todayCodingRef.current, `coding-history-${todayHistory.date}`)}
+            onClick={() => downloadHistoryAsImage(todayCodingRef.current, `coding-history-${todayHistory.date}`, todayHistory.date)}
             className="w-full py-2 px-5 rounded-lg font-semibold bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={!hasTodayCoding}
           >
@@ -204,7 +210,7 @@ const HistorySection: React.FC<HistorySectionProps> = ({ todayHistory, yesterday
             <>
               <CategoryHistoryDisplay ref={yesterdayCodingRef} history={yesterdayHistory} title="Yesterday's Progress" filterType="Coding" />
               <button
-                onClick={() => yesterdayHistory && downloadHistoryAsImage(yesterdayCodingRef.current, `coding-history-${yesterdayHistory.date}`)}
+                onClick={() => yesterdayHistory && downloadHistoryAsImage(yesterdayCodingRef.current, `coding-history-${yesterdayHistory.date}`, yesterdayHistory.date)}
                 className="w-full py-2 px-5 rounded-lg font-semibold bg-purple-600 hover:bg-purple-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={!hasYesterdayCoding}
               >
