@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import type { DailyHistory, Session, TimerType } from '../types';
 import { CodeIcon } from './icons/CodeIcon';
 import { StudyIcon } from './icons/StudyIcon';
@@ -10,6 +10,8 @@ interface HistorySectionProps {
   todayHistory: DailyHistory;
   yesterdayHistory: DailyHistory | null;
 }
+
+const AUTO_DOWNLOAD_TRACKER_KEY = 'focus_flow_auto_download_tracker';
 
 const formatTime = (totalSeconds: number): string => {
   if (totalSeconds < 60) return `${totalSeconds}s`;
@@ -156,6 +158,47 @@ const HistorySection: React.FC<HistorySectionProps> = ({ todayHistory, yesterday
         }
     }
   };
+
+  useEffect(() => {
+    const performAutoDownload = async () => {
+      // Ensure we have yesterday's history and the image library is available
+      if (!yesterdayHistory || typeof html2canvas === 'undefined') {
+        return;
+      }
+
+      try {
+        const lastAutoDownloadedDate = localStorage.getItem(AUTO_DOWNLOAD_TRACKER_KEY);
+        const yesterdayDateStr = yesterdayHistory.date;
+
+        // If we haven't already auto-downloaded the report for yesterday
+        if (lastAutoDownloadedDate !== yesterdayDateStr) {
+          console.log(`New daily history found for ${yesterdayDateStr}. Attempting auto-download...`);
+
+          const hasStudy = yesterdayHistory.sessions.some(s => s.type === 'Study');
+          const hasCoding = yesterdayHistory.sessions.some(s => s.type === 'Coding');
+
+          // Wait a moment for the DOM to be fully painted, ensuring refs are ready
+          await new Promise(resolve => setTimeout(resolve, 500)); 
+
+          if (hasStudy && yesterdayStudyRef.current) {
+            await downloadHistoryAsImage(yesterdayStudyRef.current, `study-history-${yesterdayDateStr}`, yesterdayDateStr);
+          }
+          if (hasCoding && yesterdayCodingRef.current) {
+            await downloadHistoryAsImage(yesterdayCodingRef.current, `coding-history-${yesterdayDateStr}`, yesterdayDateStr);
+          }
+
+          // Mark this date as downloaded to prevent future attempts
+          localStorage.setItem(AUTO_DOWNLOAD_TRACKER_KEY, yesterdayDateStr);
+          console.log(`Auto-download for ${yesterdayDateStr} complete. Marker set.`);
+        }
+      } catch (error) {
+        console.error("Auto-download failed:", error);
+        // On failure, we don't set the tracker, allowing a retry on the next app load.
+      }
+    };
+
+    performAutoDownload();
+  }, [yesterdayHistory]);
 
   const hasTodayStudy = todayHistory.sessions.some(s => s.type === 'Study');
   const hasYesterdayStudy = yesterdayHistory?.sessions.some(s => s.type === 'Study');
